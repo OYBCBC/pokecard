@@ -9,7 +9,8 @@ globalThis.localStorage = {
 
 const {
   newRun, newRun2P, leaveShop, winFight, fightWon, scoreHand,
-  useConsumableInstant, useConsumableDeckCard, MIN_DECK,
+  useConsumableInstant, useConsumableDeckCard, useConsumableCard, sellConsumable, buyConsumable, openShop,
+  MIN_DECK,
   markDexSeen, markCardSeen, loadDex, loadDexShiny, dexSeenCount, dexShinyCount,
   weeklySeed, dailySeed, roomKeyFor, runBoardKey, weekKey, weeklyVariant, previewReward, recordWeeklyResult, getWeeklyBoard, weeklyScore,
   buildWeeklyEntry, getSettings, saveSettings, save, load,
@@ -63,6 +64,26 @@ const small = newRun(999);
 while (small.deck.length > MIN_DECK) small.deck.pop();
 small.consumables.push('escapeRope');
 check(`牌组低于 ${MIN_DECK} 张时禁止放生`, useConsumableDeckCard(small, 0, small.deck[0].uid).error !== undefined);
+
+// ---- 商店内消耗品管理：出售 / 非战斗中使用 ----
+const shopRun = newRun(4242);
+shopRun.money = 30;
+shopRun.consumables = ['cherishBall', 'protein'];
+const refund = sellConsumable(shopRun, 0); // cherishBall 原价 8
+check('出售消耗品：退款为原价一半', refund === 4);
+check('出售后槽位释放', shopRun.consumables.length === 1 && shopRun.consumables[0] === 'protein');
+check('出售越界索引返回 0', sellConsumable(shopRun, 5) === 0);
+// 蛋白质在非战斗阶段直接对牌组卡生效（商店内使用路径）
+const boostTarget = shopRun.deck[0];
+const beforeChips = boostTarget.chipBonus;
+check('商店内蛋白质可直接强化牌组卡', useConsumableCard(shopRun, 0, boostTarget.uid) === true && boostTarget.chipBonus === beforeChips + 60);
+check('强化后消耗品已消耗', shopRun.consumables.length === 0);
+// 背包满时不可购买
+openShop(shopRun);
+shopRun.consumables = ['pokeBall', 'zinc'];
+check('背包满时购买消耗品失败', buyConsumable(shopRun, shopRun.shop.consumables[0]) === false);
+sellConsumable(shopRun, 0);
+check('腾出槽位后可购买', buyConsumable(shopRun, shopRun.shop.consumables[0]) === true);
 
 // ---- 图鉴 ----
 markDexSeen(25);

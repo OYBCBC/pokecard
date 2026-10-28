@@ -9,7 +9,7 @@ import {
   fightCount, fightInfo, MIN_DECK, evaluate,
   newRun, newRun2P, startFight, scoreHand, discardCards, afterPlay,
   fightWon, winFight, previewReward, defeat, openShop, restock, reroll, rerollCost,
-  itemPrice, consumablePrice, buyItem, buyConsumable, sellItem,
+  itemPrice, consumablePrice, buyItem, buyConsumable, sellItem, sellConsumable,
   useConsumableCard, useConsumableHandType, useConsumableDeckCard, useConsumableInstant,
   leaveShop, loadDex, loadDexShiny, dexSeenCount, dexShinyCount,
   weeklySeed, dailySeed, roomKeyFor, runBoardKey, weeklyScore,
@@ -536,13 +536,16 @@ function shopConsumableCard(id) {
   const d = CONSUMABLES[id];
   const price = consumablePrice(run, id);
   const owned = run.shop.bought['c_' + id];
+  const full = run.consumables.length >= RULES.consumableSlots;
+  const noMoney = run.money < price;
+  const blockTitle = full ? '背包已满，先使用或出售一个' : noMoney ? '钱不够' : '';
   return `
   <div class="shop-card consumable ${owned ? 'sold' : ''}" style="--rc:#8a7cc8">
     <div class="shop-card-head">${d.name}<span class="rarity-tag">消耗品</span></div>
     <img class="shop-img" src="assets/items/${d.slug}.png">
     <div class="shop-desc">${d.desc}</div>
     ${owned ? '<div class="sold-mark">已购买</div>'
-      : `<button class="buy-btn" data-action="buyConsumable" data-id="${id}" ${run.money < price || run.consumables.length >= RULES.consumableSlots ? 'disabled' : ''}>$${price}</button>`}
+      : `<button class="buy-btn" data-action="buyConsumable" data-id="${id}" ${full || noMoney ? 'disabled' : ''} ${blockTitle ? `title="${blockTitle}"` : ''}>$${price}</button>`}
   </div>`;
 }
 
@@ -559,8 +562,23 @@ function renderShop() {
     <div class="shop-section"><div class="panel-title">携带道具</div>
       <div class="shop-grid">${run.shop.items.map(shopItemCard).join('')}</div>
     </div>
-    <div class="shop-section"><div class="panel-title">消耗品（战斗中使用）</div>
+    <div class="shop-section"><div class="panel-title">消耗品${run.consumables.length >= RULES.consumableSlots ? '（背包已满，先使用或出售一个）' : '（战斗中使用）'}</div>
       <div class="shop-grid cons">${run.shop.consumables.map(shopConsumableCard).join('')}</div>
+    </div>
+    <div class="shop-section">
+      <div class="panel-title">背包（${run.consumables.length}/${RULES.consumableSlots}）</div>
+      <div class="owned-items owned-cons">
+        ${run.consumables.length ? run.consumables.map((id, i) => {
+          const d = CONSUMABLES[id];
+          const refund = Math.floor(d.price / 2);
+          return `<div class="cons-owned" data-tip="${d.name}<br>${d.desc}">
+            <img src="assets/items/${d.slug}.png" alt="${d.name}">
+            <span class="co-name">${d.name}</span>
+            <button class="mini-btn" data-action="useConsumable" data-idx="${i}">使用</button>
+            <button class="mini-btn red" data-action="sellConsumable" data-idx="${i}">售 $${refund}</button>
+          </div>`;
+        }).join('') : '<span class="dim">（空）</span>'}
+      </div>
     </div>
     <div class="shop-section">
       <div class="panel-title">身上的携带物（点击出售）</div>
@@ -1194,9 +1212,14 @@ async function onClick(e) {
       const def = CONSUMABLES[id];
       sfx.click();
       if (def.target === 'card') {
-        if (run.phase !== 'battle') { showToast('这张要在战斗中的手牌上使用', true); break; }
-        targeting = targeting && targeting.cIdx === idx ? null : { cIdx: idx };
-        render();
+        if (run.phase === 'battle') {
+          targeting = targeting && targeting.cIdx === idx ? null : { cIdx: idx };
+          render();
+        } else { // 商店等非战斗场景：改为从牌组中选一张卡强化
+          deckTargeting = { cIdx: idx, mode: 'card' };
+          document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+          showDeckModal();
+        }
       } else if (def.target === 'handType') {
         handPickFor = { cIdx: idx };
         showHandTypePicker();
@@ -1223,6 +1246,18 @@ async function onClick(e) {
     case 'deckCardPick': {
       if (!deckTargeting) break; // 非选卡模式下点卡不做事
       const uid = +btn.dataset.uid;
+      if (deckTargeting.mode === 'card') { // 蛋白质/锌补剂：商店内对牌组卡强化
+        const target = run.deck.find(x => x.uid === uid);
+        if (target && useConsumableCard(run, deckTargeting.cIdx, uid)) {
+          sfx.coin();
+          showToast(`已强化 ${target.name}！`);
+          deckTargeting = null;
+          document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+          save(run);
+          render();
+        }
+        break;
+      }
       const result = useConsumableDeckCard(run, deckTargeting.cIdx, uid);
       if (result && result.error) {
         showToast(result.error, true);
@@ -1285,6 +1320,12 @@ async function onClick(e) {
     case 'sell': {
       const idx = +btn.dataset.idx;
       const gain = sellItem(run, idx);
+      if (gain) { run.money += gain; sfx.coin(); save(run); }
+      render();
+      break;
+    }
+    case 'sellConsumable': {
+      const gain = sellConsumable(run, +btn.dataset.idx);
       if (gain) { run.money += gain; sfx.coin(); save(run); }
       render();
       break;

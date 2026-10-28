@@ -536,6 +536,13 @@ export function sellItem(run, idx) {
   return Math.floor(RARITY[ITEMS[id].rarity].price / 2);
 }
 
+export function sellConsumable(run, idx) {
+  const id = run.consumables[idx];
+  if (!id) return 0;
+  run.consumables.splice(idx, 1);
+  return Math.floor(CONSUMABLES[id].price / 2);
+}
+
 export function useConsumableCard(run, cIdx, cardUid) {
   const id = run.consumables[cIdx];
   const c = CONSUMABLES[id];
