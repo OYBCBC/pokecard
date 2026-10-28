@@ -549,6 +549,27 @@ function shopConsumableCard(id) {
   </div>`;
 }
 
+function showSellConfirm(kind, idx) {
+  const id = kind === 'item' ? run.items[idx] : run.consumables[idx];
+  if (!id) return;
+  const d = kind === 'item' ? ITEMS[id] : CONSUMABLES[id];
+  const refund = kind === 'item' ? Math.floor(RARITY[d.rarity].price / 2) : Math.floor(d.price / 2);
+  const el = document.createElement('div');
+  el.className = 'modal-overlay';
+  el.innerHTML = `<div class="modal sell-modal">
+    <div class="panel-title">确认出售</div>
+    <div class="sell-row">
+      <img src="assets/items/${d.slug}.png" alt="${d.name}">
+      <div class="sell-info"><b>${d.name}</b><span>退还 $${refund}</span></div>
+    </div>
+    <div class="modal-btns">
+      <button class="big-btn blue sm" data-action="cancelSell">取消</button>
+      <button class="big-btn red sm" data-action="confirmSell" data-kind="${kind}" data-idx="${idx}">出售 +$${refund}</button>
+    </div>
+  </div>`;
+  app.appendChild(el);
+}
+
 function renderShop() {
   const nextInfo = fightInfo(run.fightIdx);
   const cost = rerollCost(run);
@@ -1317,19 +1338,20 @@ async function onClick(e) {
 
     case 'buyItem': if (buyItem(run, btn.dataset.id)) { sfx.coin(); save(run); } render(); break;
     case 'buyConsumable': if (buyConsumable(run, btn.dataset.id)) { sfx.coin(); save(run); } render(); break;
-    case 'sell': {
+    case 'sell': sfx.click(); showSellConfirm('item', +btn.dataset.idx); break;
+    case 'sellConsumable': sfx.click(); showSellConfirm('consumable', +btn.dataset.idx); break;
+    case 'confirmSell': {
+      const kind = btn.dataset.kind;
       const idx = +btn.dataset.idx;
-      const gain = sellItem(run, idx);
-      if (gain) { run.money += gain; sfx.coin(); save(run); }
-      render();
+      const id = kind === 'item' ? run.items[idx] : run.consumables[idx];
+      const name = id ? (kind === 'item' ? ITEMS[id] : CONSUMABLES[id]).name : '';
+      const gain = kind === 'item' ? sellItem(run, idx) : sellConsumable(run, idx);
+      if (gain) { run.money += gain; sfx.coin(); showToast(`已出售 ${name} +$${gain}`); }
+      document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+      save(run); render();
       break;
     }
-    case 'sellConsumable': {
-      const gain = sellConsumable(run, +btn.dataset.idx);
-      if (gain) { run.money += gain; sfx.coin(); save(run); }
-      render();
-      break;
-    }
+    case 'cancelSell': sfx.click(); document.querySelectorAll('.modal-overlay').forEach(m => m.remove()); break;
     case 'reroll': if (reroll(run)) { sfx.click(); save(run); } render(); break;
     case 'leave': sfx.click(); leaveShop(run); selected.clear(); save(run); render(); break;
 

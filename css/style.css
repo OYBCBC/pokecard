@@ -297,6 +297,13 @@ img { pointer-events: none; }
   padding: 22px 28px; max-width: 760px; width: min(92vw, 760px); max-height: 86vh;
   overflow-y: auto; text-align: center; animation: introIn .3s ease;
 }
+.sell-modal { max-width: 380px; }
+.sell-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 16px 0 20px; }
+.sell-row img { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+.sell-info { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.sell-info b { color: #dce6f8; font-size: 16px; }
+.sell-info span { color: #ffd76a; font-weight: 800; }
+.modal-btns { display: flex; gap: 12px; justify-content: center; }
 .reward-title { font-size: 24px; font-weight: 900; margin-bottom: 8px; }
 .reward-badge { color: #ffd76a; font-weight: 800; margin-bottom: 10px; }
 .reward-money { margin: 10px auto 18px; width: 280px; text-align: left; }
