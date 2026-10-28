@@ -6,7 +6,7 @@ import {
   handBase, cardChips,
 } from './data.js';
 import {
-  fightCount, fightInfo, MIN_DECK,
+  fightCount, fightInfo, MIN_DECK, evaluate,
   newRun, newRun2P, startFight, scoreHand, discardCards, afterPlay,
   fightWon, winFight, previewReward, defeat, openShop, restock, reroll, rerollCost,
   itemPrice, consumablePrice, buyItem, buyConsumable, sellItem,
@@ -130,9 +130,29 @@ function cardHtml(card, { mini = false, inHand = false } = {}) {
     <img src="assets/${card.shiny ? 'sprites-shiny' : 'sprites'}/${card.dex}.png" alt="${card.name}" draggable="false">
     ${asleep ? '<div class="sleep-mark">💤</div>' : ''}
     <div class="card-name">${card.name}</div>
+    <div class="card-chips">${cardChips(card)}</div>
     <div class="card-power">${card.power}</div>
+    <div class="card-check">✓</div>
     ${bonuses.length ? `<div class="card-bonus">${bonuses.join('')}</div>` : ''}
   </div>`;
+}
+
+// 选牌实时预览：当前选中将打出的手牌类型与预估伤害
+function updateHandPreview() {
+  const el = $('#handPreview');
+  if (!el || !run || !run.fight) return;
+  const cards = [...selected].map(uid => run.deck.find(c => c.uid === uid)).filter(Boolean);
+  if (!cards.length) {
+    el.innerHTML = '<span class="dim">点击卡牌选中（1~5 张），打出前这里会预估手牌与伤害</span>';
+    return;
+  }
+  const ev = evaluate(cards);
+  const lv = run.handLevels[ev.key] || 1;
+  const b = handBase(ev.key, lv);
+  const cardChipsSum = ev.cards.reduce((s, c) => s + cardChips(c), 0);
+  const chips = b.chips + cardChipsSum;
+  el.innerHTML = `将打出<b>${HANDS[ev.key].name}</b>Lv${lv} · ${b.chips}+${cardChipsSum} × ${b.mult}` +
+    `<span class="hp-dmg">≈${fmt(chips * b.mult)}</span><span class="dim">（${selected.size}/5）</span>`;
 }
 
 function handPanelHtml() {
@@ -198,6 +218,10 @@ function itemsPanelHtml(editable) {
 function renderBattle() {
   const f = run.fight;
   const info = f.info;
+  // 整页 innerHTML 重建会把手牌横向滚动与页面滚动重置，先记住再还原（手机端体验关键）
+  const prevHandArea = $('#handArea');
+  const prevHandScroll = prevHandArea ? prevHandArea.scrollLeft : null;
+  const prevPageScroll = window.scrollY;
   const handCards = f.hand.map(uid => run.deck.find(c => c.uid === uid));
   const hpPct = Math.max(0, f.hp / f.maxHp * 100);
   const ruleText = !info.isLeader ? '常规战斗，无特殊规则'
@@ -237,6 +261,7 @@ function renderBattle() {
         <div class="hand-area" id="handArea">
           ${handCards.map(c => cardHtml(c, { inHand: true })).join('')}
         </div>
+        <div class="hand-preview" id="handPreview"></div>
         <div class="actions">
           <button class="big-btn red sm" data-action="play" id="playBtn">打出 <small>剩余 ${f.hands} 手</small></button>
           <button class="big-btn blue sm" data-action="discard" id="discardBtn" ${f.discards <= 0 ? 'disabled' : ''}>弃牌 <small>剩 ${f.discards} 次</small></button>
@@ -245,6 +270,12 @@ function renderBattle() {
       ${itemsPanelHtml(true)}
     </div>
   </div>`;
+  updateHandPreview();
+  if (prevHandScroll != null) {
+    const ha = $('#handArea');
+    if (ha) ha.scrollLeft = prevHandScroll;
+  }
+  if (prevPageScroll) window.scrollTo(0, prevPageScroll);
 
   if (fightIntroShown !== run.fightIdx) {
     fightIntroShown = run.fightIdx;
@@ -1112,11 +1143,22 @@ async function onClick(e) {
       if (targeting) { applyConsumableToCard(+btn.dataset.uid); return; }
       const uid = +btn.dataset.uid;
       const f = run.fight;
-      if (uid === f.sleepUid) { sfx.sleep(); return; }
-      if (selected.has(uid)) { selected.delete(uid); sfx.deselect(); }
-      else if (selected.size < 5) { selected.add(uid); sfx.select(); }
-      else return;
-      render();
+      if (uid === f.sleepUid) { showToast('这只宝可梦在睡眠中，这一手打不出 💤'); sfx.sleep(); return; }
+      if (selected.has(uid)) {
+        selected.delete(uid); sfx.deselect();
+      } else if (selected.size < 5) {
+        selected.add(uid); sfx.select();
+      } else {
+        // 已选满 5 张：抖动提示，不重渲染（保住动画）
+        sfx.hurt();
+        btn.classList.remove('deny'); void btn.offsetWidth; btn.classList.add('deny');
+        showToast('最多同时选择 5 张');
+        break;
+      }
+      // 就地更新选中态而非整页重渲染：手机上手牌区横向滚动位置会在 innerHTML 重建时被重置，
+      // 导致"点到后面的牌却弹回最前面"。选中状态只差一个 class，补齐预览即可。
+      btn.classList.toggle('selected', selected.has(uid));
+      updateHandPreview();
       break;
     }
     case 'play': doPlay(); break;
