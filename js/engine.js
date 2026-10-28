@@ -14,6 +14,8 @@ export function newRun(seed, weeklyKey = null, forcedVariant = null) {
     v: 1,
     seed,
     weekly: weeklyKey,
+    daily: null,         // 每日挑战 key（YYYY-MM-DD）
+    roomKey: null,       // 挑战房榜 key（ROOM-XXXX）
     variant: forcedVariant || (weeklyKey ? weeklyVariant(weeklyKey).key : null),
     token: Date.now().toString(36) + Math.random().toString(36).slice(2, 10), // 周榜防刷令牌
     submitted: false,
@@ -629,6 +631,38 @@ export function weeklySeed() {
   return { seed: h >>> 0, key };
 }
 
+// 每日挑战：本地日期号确定性种子（与周挑战各自独立轮换变体）
+export function dayKey(date = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+}
+
+export function dailySeed() {
+  const key = dayKey();
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return { seed: h >>> 0, key };
+}
+
+// 挑战房：同挑战码 → 同房间榜
+export function roomKeyFor(seed, variant) {
+  let h = 2166136261;
+  const s = `${seed}:${variant || 'standard'}`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 'ROOM-' + (h >>> 0).toString(36).toUpperCase();
+}
+
+// 当前对局的榜 key（周/日/房间三轨，互斥）
+export function runBoardKey(run) {
+  return run.weekly || run.daily || run.roomKey || null;
+}
+
 const BOARD_KEY = 'gymrun-weekly-board-v1';
 
 export function weeklyScore(run) {
@@ -755,7 +789,7 @@ export function buildWeeklyEntry(run) {
   return {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
     token: run.token,
-    key: run.weekly,
+    key: runBoardKey(run),
     name: getSettings().name,
     score: weeklyScore(run),
     result: run.phase === 'victory' ? '冠军' : '止步',
@@ -767,7 +801,7 @@ export function buildWeeklyEntry(run) {
 }
 
 export async function submitWeeklyScore(run) {
-  if (!run.weekly || run.submitted) return null;
+  if (run.submitted || !runBoardKey(run)) return null;
   run.submitted = true;
   const entry = buildWeeklyEntry(run);
   try {

@@ -479,6 +479,8 @@ img { pointer-events: none; }
 .hist-hand .hp-P1, .hist-hand .hp-P2 { font-style: normal; font-size: 10px; padding: 1px 5px; border-radius: 6px; margin-right: 4px; color: #fff; }
 .hist-hand .hp-P1 { background: #c53a31; }
 .hist-hand .hp-P2 { background: #3572c0; }
+.board-btns { display: flex; gap: 8px; }
+.board-key { font-size: 11px; font-weight: 400; }
 .weather-pill {
   font-size: 12px; font-weight: 800; color: #ffd76a; background: rgba(232, 167, 46, .18);
   border: 1px solid rgba(232, 167, 46, .5); border-radius: 10px; padding: 2px 10px; margin-left: 8px;

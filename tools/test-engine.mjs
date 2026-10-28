@@ -11,7 +11,7 @@ const {
   newRun, newRun2P, leaveShop, winFight, fightWon, scoreHand,
   useConsumableInstant, useConsumableDeckCard, MIN_DECK,
   markDexSeen, markCardSeen, loadDex, loadDexShiny, dexSeenCount, dexShinyCount,
-  weeklySeed, weekKey, weeklyVariant, previewReward, recordWeeklyResult, getWeeklyBoard, weeklyScore,
+  weeklySeed, dailySeed, roomKeyFor, runBoardKey, weekKey, weeklyVariant, previewReward, recordWeeklyResult, getWeeklyBoard, weeklyScore,
   buildWeeklyEntry, getSettings, saveSettings, save, load,
   encodeChallenge, decodeChallenge, buildReportJson,
 } = await import('../js/engine.js');
@@ -207,6 +207,17 @@ scoreHand(r2p, [r2p.fight.hand[0]]);
 const eng = await import('../js/engine.js');
 eng.defeat(r2p);
 check('2P 败者出局判胜', r2p.phase === 'defeat' && r2p.winner === 0);
+// ---- 每日挑战 / 挑战房 ----
+check('每日种子确定性', dailySeed().seed === dailySeed().seed && /^\d{4}-\d{2}-\d{2}$/.test(dailySeed().key));
+check('日/周种子互不相同', dailySeed().seed !== weeklySeed().seed);
+check('房间 key 稳定且同码同房', roomKeyFor(999, 'elite') === roomKeyFor(999, 'elite') && roomKeyFor(999, 'elite') !== roomKeyFor(998, 'elite') && roomKeyFor(1, 'standard').startsWith('ROOM-'));
+const dailyRun = newRun(dailySeed().seed, null, 'elite');
+dailyRun.daily = dailySeed().key;
+check('每日局榜单 key 解析', buildWeeklyEntry(dailyRun).key === dailySeed().key);
+const roomRun = newRun(777, null, 'duo');
+roomRun.roomKey = roomKeyFor(777, 'duo');
+check('房间局榜单 key 解析', buildWeeklyEntry(roomRun).key === roomRun.roomKey);
+check('普通局不产生榜单 key', runBoardKey(newRun(5)) === null);
 // 2P 存档往返
 save(r2p);
 const r2pLoaded = load();

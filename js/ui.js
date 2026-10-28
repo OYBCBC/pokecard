@@ -12,7 +12,8 @@ import {
   itemPrice, consumablePrice, buyItem, buyConsumable, sellItem,
   useConsumableCard, useConsumableHandType, useConsumableDeckCard, useConsumableInstant,
   leaveShop, loadDex, loadDexShiny, dexSeenCount, dexShinyCount,
-  weeklySeed, weeklyScore, recordWeeklyResult, getWeeklyBoard,
+  weeklySeed, dailySeed, roomKeyFor, runBoardKey, weeklyScore,
+  recordWeeklyResult, getWeeklyBoard,
   submitWeeklyScore, fetchWeeklyBoard, getSettings, saveSettings,
   encodeChallenge, decodeChallenge, buildReportJson,
   save, load, clearSave, hasSave,
@@ -85,6 +86,7 @@ function renderTitle() {
     </div>
     <div class="title-menu">
       <button class="big-btn red" data-action="start">开始新的挑战</button>
+      <button class="big-btn gold" data-action="startDaily" data-tip="${weeklyVariant(dailySeed().key).desc}">今日挑战 · ${dailySeed().key.slice(5).replace('-', '/')} · ${weeklyVariant(dailySeed().key).name}</button>
       <button class="big-btn gold" data-action="startWeekly" data-tip="${weeklyVariant(weeklySeed().key).desc}">本周挑战 · ${weekKeyLabel()} · ${weeklyVariant(weeklySeed().key).name}</button>
       <button class="big-btn blue" data-action="start2P">双人热座挑战</button>
       <button class="big-btn blue" data-action="customChallenge">自定义挑战房</button>
@@ -92,7 +94,10 @@ function renderTitle() {
         挑战码：<input id="codeInput" placeholder="粘贴 GYM1.xxxx" style="width:200px">
         <button class="mini-btn" data-action="joinCode">进入</button>
       </div>
-      <button class="mini-btn wide" data-action="weeklyBoard">查看本周排行榜</button>
+      <div class="board-btns">
+        <button class="mini-btn wide" data-action="dailyBoard">今日榜</button>
+        <button class="mini-btn wide" data-action="weeklyBoard">本周榜</button>
+      </div>
       ${hasSave() ? '<button class="big-btn blue" data-action="continue">继续上次挑战</button>' : ''}
       <div class="seed-row">种子：<input id="seedInput" placeholder="留空随机" maxlength="10"></div>
     </div>
@@ -392,7 +397,7 @@ async function doPlay() {
     clearSave();
     sfx.lose();
     await sleep(600);
-    if (run.weekly) {
+    if (runBoardKey(run)) {
       lastWeeklyRank = recordWeeklyResult(run);       // 本地兜底
       const cloud = await submitWeeklyScore(run);      // 云端提交
       if (cloud && cloud.online && cloud.rank) lastWeeklyRank = { ...lastWeeklyRank, rank: cloud.rank, online: true };
@@ -586,6 +591,8 @@ function renderEnd() {
         <button class="big-btn gold" data-action="shareCard">保存战绩图</button>
         <button class="big-btn gold" data-action="history">本局战报</button>
         ${run.weekly ? '<button class="big-btn gold" data-action="weeklyBoard">本周排行榜</button>' : ''}
+        ${run.daily ? '<button class="big-btn gold" data-action="dailyBoard">今日榜</button>' : ''}
+        ${run.roomKey ? '<button class="big-btn gold" data-action="roomBoard">房间榜</button>' : ''}
         <button class="big-btn blue" data-action="toTitle">回到标题</button>
       </div>
     </div>
@@ -703,11 +710,14 @@ function showItemInfoModal(idx) {
   app.appendChild(el);
 }
 
-function showWeeklyBoardModal(highlight) {
+function showWeeklyBoardModal(highlight, opts = {}) {
+  const key = opts.key || (run && runBoardKey(run)) || weeklySeed().key;
+  const label = opts.label || (key.startsWith('ROOM-') ? '挑战房排行榜'
+    : /^\d{4}-\d{2}-\d{2}$/.test(key) ? '今日挑战排行榜' : '每周挑战排行榜');
   const el = document.createElement('div');
   el.className = 'modal-overlay';
   el.innerHTML = `<div class="modal">
-    <div class="panel-title">每周挑战排行榜 <span class="board-source dim">加载中…</span></div>
+    <div class="panel-title">${label} <span class="board-key dim">${key}</span> <span class="board-source dim">加载中…</span></div>
     <table class="board-table">
       <tr><th>名次</th><th>训练师</th><th>结果</th><th>进度</th><th>最大伤害</th><th>积分</th></tr>
       <tbody class="board-body"><tr><td colspan="6" class="dim">加载中…</td></tr></tbody>
@@ -719,7 +729,7 @@ function showWeeklyBoardModal(highlight) {
   const source = el.querySelector('.board-source');
   const renderBoard = (board, online) => {
     if (!board.length) {
-      body.innerHTML = '<tr><td colspan="6" class="dim">本周还没有记录，去打一场吧！</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="dim">还没有记录，去打一场吧！</td></tr>';
     } else {
       body.innerHTML = board.map((e, i) => `
         <tr class="${highlight && i === highlight - 1 ? 'hl' : ''}">
@@ -730,10 +740,9 @@ function showWeeklyBoardModal(highlight) {
     }
     source.textContent = online ? '（云端共享榜）' : '（本机记录，云端不可用）';
   };
-  const key = (run && run.weekly) ? run.weekly : weeklySeed().key;
   fetchWeeklyBoard(key).then(board => {
     if (board) renderBoard(board.slice(0, 10), true);
-    else renderBoard(getWeeklyBoard(), false);
+    else renderBoard(getWeeklyBoard().filter(e => e.key === key), false);
   });
 }
 
@@ -860,6 +869,7 @@ function showChallengeCodeModal() {
     <div class="item-info-btns" style="margin-top:12px">
       <button class="big-btn red sm" data-action="copyCode">复制挑战码</button>
       <button class="big-btn gold sm" data-action="exportReport">导出战报 JSON</button>
+      <button class="big-btn gold sm" data-action="roomBoard">房间榜</button>
       <button class="big-btn blue sm" data-action="closeModal">关闭</button>
     </div>
   </div>`;
@@ -1001,6 +1011,16 @@ async function onClick(e) {
       render();
       break;
     }
+    case 'startDaily': {
+      const { seed, key } = dailySeed();
+      run = newRun(seed, null, weeklyVariant(key).key); // 每日独立轮换变体
+      run.daily = key;
+      selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; lastHandKey = null;
+      save(run);
+      sfx.badge();
+      render();
+      break;
+    }
     case 'startWeekly': {
       const { seed, key } = weeklySeed();
       run = newRun(seed, key);
@@ -1027,12 +1047,13 @@ async function onClick(e) {
       const seedStr = modal.querySelector('#customSeed').value.trim();
       const seed = seedStr ? hashSeed(seedStr) : (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
       run = newRun(seed, null, variant);
+      run.roomKey = roomKeyFor(seed, variant);
       selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; lastHandKey = null;
       save(run);
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
       sfx.badge();
       render();
-      showToast(`自定义挑战：${(WEEKLY_VARIANTS.find(v => v.key === variant) || {}).name} · 种子 ${seed}`);
+      showToast(`自定义挑战：${(WEEKLY_VARIANTS.find(v => v.key === variant) || {}).name} · 种子 ${seed} · 房间榜 ${run.roomKey}`);
       break;
     }
     case 'joinCode': {
@@ -1040,6 +1061,7 @@ async function onClick(e) {
       const parsed = decodeChallenge(input ? input.value : '');
       if (!parsed) { showToast('挑战码无效，应以 GYM1. 开头', true); sfx.hurt(); break; }
       run = newRun(parsed.seed, null, parsed.variant);
+      run.roomKey = roomKeyFor(parsed.seed, parsed.variant);
       selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; lastHandKey = null;
       save(run);
       sfx.badge();
@@ -1075,7 +1097,9 @@ async function onClick(e) {
       if (r) { run = r; selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; render(); }
       break;
     }
-    case 'weeklyBoard': sfx.click(); showWeeklyBoardModal(); break;
+    case 'weeklyBoard': sfx.click(); showWeeklyBoardModal(null, { key: weeklySeed().key }); break;
+    case 'dailyBoard': sfx.click(); showWeeklyBoardModal(null, { key: dailySeed().key }); break;
+    case 'roomBoard': sfx.click(); showWeeklyBoardModal(null, { key: run.roomKey }); break;
     case 'dex': sfx.click(); showDexModal(); break;
     case 'handTypes': sfx.click(); showHandTypesModal(); break;
     case 'settings': sfx.click(); showSettingsModal(); break;
@@ -1198,7 +1222,7 @@ async function onClick(e) {
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
       if (run.phase === 'victory') {
         clearSave();
-        if (run.weekly) {
+        if (runBoardKey(run)) {
           lastWeeklyRank = recordWeeklyResult(run);
           const cloud = await submitWeeklyScore(run);
           if (cloud && cloud.online && cloud.rank) lastWeeklyRank = { ...lastWeeklyRank, rank: cloud.rank, online: true };
