@@ -1,0 +1,13 @@
+{
+  "name": "宝可梦 · 徽章之路（粉丝游戏）",
+  "short_name": "徽章之路",
+  "description": "Balatro 式卡牌构筑肉鸽 × 宝可梦素材（非官方粉丝作品）",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#10151f",
+  "theme_color": "#1a2233",
+  "icons": [
+    { "src": "assets/sprites/25.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/sprites/25.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

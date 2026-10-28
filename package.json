@@ -1,0 +1,11 @@
+{
+  "name": "gym-run",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "宝可梦·徽章之路 — 非官方粉丝卡牌构筑肉鸽（Balatro 式玩法 × 宝可梦素材）",
+  "scripts": {
+    "start": "python3 -m http.server 8347",
+    "test": "node tools/test-eval.mjs && node tools/sim.mjs"
+  }
+}

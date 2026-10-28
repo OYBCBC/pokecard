@@ -1,0 +1,16 @@
+# 系统文件
+.DS_Store
+
+# 运行时数据（云端周榜本地存储，部署后自动生成）
+scores.json
+
+# Python
+__pycache__/
+*.pyc
+
+# 编辑器
+.vscode/
+.idea/
+
+# 本地临时
+*.log
