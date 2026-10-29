@@ -251,6 +251,7 @@ function renderBattle() {
             <div class="opp-ace">王牌：${info.aceName}</div>
             ${f.poison > 0 ? `<div class="poison-badge">☠ 中毒 ×${f.poison}（每手结算 -${f.poison * 20}）</div>` : ''}
             <div class="opp-rule ${f.rule.kind === 'none' ? 'dim' : ''}">${ruleText}</div>
+            ${f.ult ? `<div class="ult-chip ${f.ultUsed ? 'used' : ''}" data-tip="馆主大招：${f.ult.name} —— ${f.ult.desc}（血量首次跌破 60% 时发动，每场一次）">${f.ultUsed ? '大招已发动' : `⚡ 大招待命：${f.ult.name}`}</div>` : ''}
           </div>
           <div class="opp-hp">
             <div class="hp-bar"><div class="hp-fill" style="width:${hpPct}%"></div><span class="hp-text">${fmt(f.hp)} / ${fmt(f.maxHp)}</span></div>
@@ -302,6 +303,7 @@ function showIntro(info, ruleText) {
       <img src="assets/sprites/${info.aceId}.png">
       <h2>${info.name}</h2>
       <p>${ruleText}</p>
+      ${info.ult ? `<p class="ult-line">⚡ 馆主大招【${info.ult.name}】：${info.ult.desc}</p>` : ''}
     </div>`;
   app.appendChild(el);
   sfx.badge();
@@ -331,7 +333,9 @@ function showDialogue(info, ruleText) {
   const show = () => {
     nameEl.textContent = lines[idx].s;
     textEl.textContent = lines[idx].t;
-    hintEl.textContent = idx === lines.length - 1 ? `规则：${ruleText} ▸` : '点击继续 ▸';
+    hintEl.textContent = idx === lines.length - 1
+      ? `${info.ult ? `⚡大招【${info.ult.name}】· ` : ''}规则：${ruleText} ▸`
+      : '点击继续 ▸';
   };
   show();
   el.addEventListener('click', () => {
@@ -414,6 +418,17 @@ async function doPlay() {
       sfx.hurt();
       shakeScreen();
       await sleep(460);
+    } else if (ev.type === 'ult') {
+      showToast(`⚡ ${run.fight.info.name} 的大招【${ev.name}】！${ev.desc}`);
+      sfx.ult();
+      const hpEl = $('.hp-bar');
+      if (ev.heal) showFloat(hpEl || rowEl, `+${fmt(ev.heal)}`, '#7ce07c', 'big');
+      if (ev.selfDmg) showFloat(hpEl || rowEl, `-${fmt(ev.selfDmg)}`, '#ffd24a', 'big');
+      await sleep(700);
+    } else if (ev.type === 'ultHalve') {
+      showFloat(rowEl, `⚡ 麻痹：伤害减半 ${fmt(ev.from)} → ${fmt(ev.to)}`, '#ff5a5a');
+      sfx.hurt();
+      await sleep(360);
     } else if (ev.type === 'sash') {
       showToast('气势披带发动！追加 1 手牌机会！（本场仅一次）');
       sfx.badge();
@@ -1423,5 +1438,6 @@ if (typeof location !== 'undefined' && location.search.includes('debug')) {
     get run() { return run; },
     get busy() { return busy; },
     sfx,
+    skipTo(idx) { run.fightIdx = idx; startFight(run); save(run); render(); },
   };
 }

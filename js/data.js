@@ -139,14 +139,15 @@ export const RARITY = {
 
 // 消耗品（对应"行星牌/塔罗牌"位）
 // target: 'card'=战斗中选手牌 | 'handType'=选手牌类型 | 'deckCard'=牌组中选一张 | 'none'=立即生效
+// ramp: 永久成长类每买一次涨价 +ramp（v1.9：堵死"无限买药"）
 export const CONSUMABLES = {
-  protein:    { name: '蛋白质', slug: 'protein', price: 4, desc: '为一张卡永久 +60 攻击', target: 'card', apply: (card) => { card.chipBonus += 60; } },
-  zinc:       { name: '锌补剂', slug: 'zinc', price: 4, desc: '为一张卡永久 +4 倍率', target: 'card', apply: (card) => { card.multBonus += 4; } },
+  protein:    { name: '蛋白质', slug: 'protein', price: 4, ramp: 2, desc: '为一张卡永久 +60 攻击（每买一次涨价 +$2）', target: 'card', apply: (card) => { card.chipBonus += 60; } },
+  zinc:       { name: '锌补剂', slug: 'zinc', price: 4, ramp: 2, desc: '为一张卡永久 +4 倍率（每买一次涨价 +$2）', target: 'card', apply: (card) => { card.multBonus += 4; } },
   upGrade:    { name: '升级数据', slug: 'up-grade', price: 6, desc: '选择一种手牌类型，等级 +1', target: 'handType', apply: (run, key) => { run.handLevels[key] = (run.handLevels[key] || 1) + 1; } },
   escapeRope: { name: '离洞绳', slug: 'escape-rope', price: 4, desc: '放生一张卡，将其从牌组中永久移除（牌组至少保留 20 张）', target: 'deckCard', deckOp: 'remove' },
   pokeBall:   { name: '精灵球', slug: 'poke-ball', price: 4, desc: '随机捕获一只新宝可梦加入牌组（5% 概率是闪光！）', target: 'none', deckOp: 'capture' },
-  repeatBall: { name: '重复球', slug: 'repeat-ball', price: 6, desc: '复制一张卡（连同强化与闪光），加入牌组', target: 'deckCard', deckOp: 'copy' },
-  cherishBall:{ name: '珍贵球', slug: 'cherish-ball', price: 8, desc: '使一张卡变为闪光：立绘变为闪光版，攻击 +80', target: 'deckCard', deckOp: 'shiny' },
+  repeatBall: { name: '重复球', slug: 'repeat-ball', price: 6, ramp: 2, desc: '复制一张卡（连同强化与闪光），加入牌组（每买一次涨价 +$2）', target: 'deckCard', deckOp: 'copy' },
+  cherishBall:{ name: '珍贵球', slug: 'cherish-ball', price: 8, ramp: 2, desc: '使一张卡变为闪光：立绘变为闪光版，攻击 +80（每买一次涨价 +$2）', target: 'deckCard', deckOp: 'shiny' },
 };
 
 // 道馆与对手。每馆 = 训练师战( idx 偶 ) + 馆主战( idx 奇 )，共 16 场 + 冠军战
@@ -156,6 +157,7 @@ export const GYMS = [
   { gym: '尼比道馆', leader: '小刚', badge: '灰色徽章', ace: 95, aceName: '大岩蛇', color: '#b8a038',
     trainer: '短裤小子·阿健', trainerAce: 74, trainerAceName: '小拳石',
     rule: { kind: 'debuffType', type: 'fire', factor: 0.5 }, ruleDesc: '磐石壁垒：【火】属性卡的攻击减半',
+    ult: { name: '磐石重整', kind: 'healLost', pct: 0.25, desc: '重整岩石壁垒，回复已损失血量的 25%' },
     victory: '岩石般的意志，也会有被水流磨平的一天……这枚徽章，是你的了。',
     dialogue: [
       { s: '小刚', t: '欢迎来到尼比道馆！我像岩石一样坚强！' },
@@ -164,6 +166,7 @@ export const GYMS = [
   { gym: '华蓝道馆', leader: '小霞', badge: '蓝色徽章', ace: 121, aceName: '宝石海星', color: '#58a6f0',
     trainer: '泳装姐姐·小琳', trainerAce: 118, trainerAceName: '角金鱼',
     rule: { kind: 'minusDiscards', n: 2 }, ruleDesc: '水之波动：本场弃牌次数 -2',
+    ult: { name: '水之庇护', kind: 'healMax', pct: 0.15, desc: '水幕包裹全身，回复 15% 最大血量' },
     victory: '哼！下次我会更漂亮地赢回来。拿去，蓝色徽章！',
     dialogue: [
       { s: '小霞', t: '华蓝道馆的美人鱼，就是我！' },
@@ -172,6 +175,7 @@ export const GYMS = [
   { gym: '枯叶道馆', leader: '马志士', badge: '橙色徽章', ace: 125, aceName: '电击兽', color: '#f8d030',
     trainer: '水兵·大志', trainerAce: 81, trainerAceName: '小磁怪',
     rule: { kind: 'minusHandSize', n: 1 }, ruleDesc: '电网压制：手牌上限 -1（7 张）',
+    ult: { name: '十万伏特', kind: 'halveNext', desc: '电流麻痹你的宝可梦，你的下一手伤害减半' },
     victory: '了不起！你这种速度，连我的闪电都追不上！',
     dialogue: [
       { s: '马志士', t: '十年来，我在战场上一次都没输过！' },
@@ -180,6 +184,7 @@ export const GYMS = [
   { gym: '彩虹道馆', leader: '莉佳', badge: '彩虹徽章', ace: 45, aceName: '霸王花', color: '#63bc5a',
     trainer: '花童·小花', trainerAce: 44, trainerAceName: '臭臭花',
     rule: { kind: 'sleep' }, ruleDesc: '催眠粉：每次补充手牌后，随机一张手牌陷入睡眠无法打出',
+    ult: { name: '光合作用', kind: 'healMax', pct: 0.12, desc: '沐浴阳光恢复生机，回复 12% 最大血量' },
     victory: '打得真好……这朵徽章，就像礼物一样送给你。',
     dialogue: [
       { s: '莉佳', t: '彩虹道馆，以花之名欢迎您。' },
@@ -188,6 +193,7 @@ export const GYMS = [
   { gym: '浅红道馆', leader: '阿橘', badge: '粉色徽章', ace: 110, aceName: '双弹瓦斯', color: '#a040a0',
     trainer: '忍者·阿忍', trainerAce: 109, trainerAceName: '瓦斯弹',
     rule: { kind: 'minusHands', n: 1 }, ruleDesc: '毒雾弥漫：本场手数 -1（3 手）',
+    ult: { name: '烟幕', kind: 'burnDiscards', desc: '忍者烟幕笼罩战场，你的弃牌次数清零' },
     victory: '败得心服口服。忍者的字典里，没有借口两个字。',
     dialogue: [
       { s: '阿橘', t: '忍者的世界里，一击定胜负。' },
@@ -196,6 +202,7 @@ export const GYMS = [
   { gym: '金黄道馆', leader: '娜姿', badge: '金色徽章', ace: 65, aceName: '胡地', color: '#f858a8',
     trainer: '超能力者·小遥', trainerAce: 64, trainerAceName: '勇基拉',
     rule: { kind: 'sealType', factor: 0.5 }, ruleDesc: '意念封锁：随机一种属性被封锁，该属性卡的攻击减半',
+    ult: { name: '二次预知', kind: 'sealAnother', desc: '再预知一种属性并封锁，两种属性攻击同时减半' },
     victory: '……有趣。我的预知能力，第一次落空了。',
     dialogue: [
       { s: '娜姿', t: '你的到来，我早就用超能力预见了。' },
@@ -204,6 +211,7 @@ export const GYMS = [
   { gym: '红莲道馆', leader: '夏伯', badge: '深红徽章', ace: 59, aceName: '风速狗', color: '#f08030',
     trainer: '赌徒·老张', trainerAce: 58, trainerAceName: '卡蒂狗',
     rule: { kind: 'flushMinus', n: 3 }, ruleDesc: '猜谜时间：打出【同花】时倍率 -3',
+    ult: { name: '孤注一掷', kind: 'gambleHeal', healPct: 0.18, hurtPct: 0.1, desc: '老头子的豪赌：一半几率回复 18% 血量，一半几率自损 10%' },
     victory: '哈哈哈！好答案！老头子我输得痛快！',
     dialogue: [
       { s: '夏伯', t: '哈哈哈！想赢我这个老头的道馆，先答对一道题！' },
@@ -212,6 +220,7 @@ export const GYMS = [
   { gym: '常磐道馆', leader: '板木', badge: '绿色徽章', ace: 112, aceName: '钻角犀兽', color: '#c8b060',
     trainer: '火箭队手下', trainerAce: 24, trainerAceName: '阿柏蛇',
     rule: { kind: 'multCap', cap: 12 }, ruleDesc: '地震：每手牌的倍率最高只能到 12',
+    ult: { name: '大地威压', kind: 'capNext', value: 6, desc: '大地之力压制全场，你的下一手倍率封顶 6' },
     victory: '哼……绿色徽章拿去吧。以你的实力，要不要考虑来火箭队？',
     dialogue: [
       { s: '板木', t: '常磐道馆馆主、火箭队的老大——板木，就是我。' },
@@ -222,6 +231,7 @@ export const GYMS = [
 export const CHAMPION = {
   gym: '石英高原', leader: '冠军·青绿', badge: '冠军之证', ace: 149, aceName: '快龙', color: '#f0c040',
   rule: { kind: 'none' }, ruleDesc: '名副其实的最强训练家，没有花招——只有强大的实力。',
+  ult: { name: '王牌登场', kind: 'healMax', pct: 0.2, desc: '压箱底的实力，回复 20% 最大血量' },
   victory: '……怎么会！好吧，冠军的宝座暂且借你坐坐。下次，我一定赢回来！',
   dialogue: [
     { s: '青绿', t: '喂！总算走到这里了啊。' },
@@ -249,31 +259,36 @@ export function weeklyVariant(weekKeyStr) {
   return WEEKLY_VARIANTS[(h >>> 0) % WEEKLY_VARIANTS.length];
 }
 
-// 战斗数值曲线
+// 战斗数值曲线（v1.9 难度平衡：后程曲线变陡、经济收紧）
 export const RULES = {
   startMoney: 6,
   trainerReward: 7,
   leaderReward: 12,
   interestPer: 5,     // 每 $5 存款
-  interestMax: 6,
+  interestMax: 4,     // 利息上限（6→4）
   baseTarget: 280,    // 第 0 场目标
-  growth: 1.26,       // 每场增长
+  growth: 1.26,       // 每场增长（前 8 场）
+  lateGrowth: 1.36,   // 第 8 场（金黄道馆）起每场增长，后程变陡
+  lateFrom: 8,
   leaderMult: 1.4,    // 馆主战倍率
-  championMult: 1.45, // 冠军战倍率
+  championMult: 2.0,  // 冠军战倍率（1.45→2.0）
   handSize: 8,
   handsPerFight: 4,
   discardsPerFight: 3,
   itemSlots: 5,
   consumableSlots: 2,
   rerollCost: 5,
+  ultTrigger: 0.6,    // 馆主大招：血量首次跌破最大血量 60% 时发动
 };
 
 export function targetHp(fightIdx) {
-  const { baseTarget, growth, leaderMult, championMult } = RULES;
+  const { baseTarget, growth, lateGrowth, lateFrom, leaderMult, championMult } = RULES;
   const totalFights = GYMS.length * 2 + 1;
-  if (fightIdx >= totalFights - 1) return Math.round(baseTarget * Math.pow(growth, 15) * championMult);
+  // 前 lateFrom 步按 growth 复利，其后按 lateGrowth（后程需求追着滚雪球跑）
+  const grow = n => Math.pow(growth, Math.min(n, lateFrom)) * Math.pow(lateGrowth, Math.max(0, n - lateFrom));
+  if (fightIdx >= totalFights - 1) return Math.round(baseTarget * grow(totalFights - 1) * championMult);
   const isLeader = fightIdx % 2 === 1;
-  return Math.round(baseTarget * Math.pow(growth, fightIdx) * (isLeader ? leaderMult : 1));
+  return Math.round(baseTarget * grow(fightIdx) * (isLeader ? leaderMult : 1));
 }
 
 export function cardChips(card) {

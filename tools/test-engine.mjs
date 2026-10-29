@@ -8,8 +8,9 @@ globalThis.localStorage = {
 };
 
 const {
-  newRun, newRun2P, leaveShop, winFight, fightWon, scoreHand,
+  newRun, newRun2P, leaveShop, winFight, fightWon, scoreHand, startFight,
   useConsumableInstant, useConsumableDeckCard, useConsumableCard, sellConsumable, buyConsumable, buyItem, openShop,
+  consumablePrice,
   MIN_DECK,
   markDexSeen, markCardSeen, loadDex, loadDexShiny, dexSeenCount, dexShinyCount,
   weeklySeed, dailySeed, roomKeyFor, runBoardKey, weekKey, weeklyVariant, previewReward, recordWeeklyResult, getWeeklyBoard, weeklyScore,
@@ -282,6 +283,101 @@ saveSettings({ name: '小智', sfx: 0.5 });
 check('设置读写', getSettings().name === '小智' && getSettings().sfx === 0.5);
 const wkEntry = buildWeeklyEntry(elite);
 check('云端条目字段完整', wkEntry.id.length >= 8 && wkEntry.name === '小智' && wkEntry.variant === 'elite' && typeof wkEntry.score === 'number');
+
+// ---- v1.9 难度平衡 ----
+check('曲线：前 8 场不变', targetHp(0) === 280 && targetHp(8) === Math.round(280 * Math.pow(1.26, 8)));
+check('曲线：第 8 场起变陡', targetHp(12) === Math.round(280 * Math.pow(1.26, 8) * Math.pow(1.36, 4)));
+check('曲线：冠军战 ×2.0', targetHp(16) === Math.round(280 * Math.pow(1.26, 8) * Math.pow(1.36, 8) * 2.0));
+check('利息上限收紧为 4', (() => { const r = newRun(55); r.money = 30; return previewReward(r).interest === 4; })());
+const rampRun = newRun(56);
+openShop(rampRun);
+rampRun.money = 100;
+rampRun.shop.consumables = ['protein', 'protein'];
+rampRun.shop.bought = {};
+check('成长类消耗品首次原价', consumablePrice(rampRun, 'protein') === 4);
+buyConsumable(rampRun, 0);
+check('买后涨价 +$2', consumablePrice(rampRun, 'protein') === 6 && rampRun.money === 96);
+buyConsumable(rampRun, 1);
+check('再买再涨至 $8', consumablePrice(rampRun, 'protein') === 8);
+check('非成长类不涨价', consumablePrice(rampRun, 'escapeRope') === 4);
+
+// ---- 馆主大招（B1）----
+check('训练师战无大招', newRun(66).fight.ult === null);
+const ultRun = newRun(61);
+ultRun.fightIdx = 3; // 小霞·水之庇护（回复 15% 最大血量）
+startFight(ultRun);
+const uf = ultRun.fight;
+check('馆主战携带大招', !!uf.ult && uf.ult.kind === 'healMax' && uf.ultUsed === false);
+uf.hp = Math.ceil(uf.maxHp * 0.6) + 5;
+const hpBeforeUlt = uf.hp;
+uf.hand = [ultRun.deck[0].uid];
+const ultRes = scoreHand(ultRun, [ultRun.deck[0].uid]);
+check('血量跌破 60% 触发大招', uf.ultUsed === true && ultRes.events.some(e => e.type === 'ult' && e.name === '水之庇护'));
+check('大招回复 15% 最大血量', uf.hp === Math.min(uf.maxHp, hpBeforeUlt - ultRes.total + Math.round(uf.maxHp * 0.15)));
+uf.hp = Math.ceil(uf.maxHp * 0.5);
+uf.hand = [ultRun.deck[1].uid];
+check('大招每场仅一次', !scoreHand(ultRun, [ultRun.deck[1].uid]).events.some(e => e.type === 'ult'));
+save(ultRun);
+const ultLoaded = load();
+check('大招状态存档往返', ultLoaded.fight.ultUsed === true && ultLoaded.fight.ult.name === '水之庇护');
+
+// 马志士·十万伏特：下一手伤害减半
+const parRun = newRun(62);
+parRun.fightIdx = 5;
+startFight(parRun);
+const pf = parRun.fight;
+check('马志士大招为伤害减半', pf.ult.kind === 'halveNext');
+pf.hp = Math.ceil(pf.maxHp * 0.6) + 5;
+pf.hand = [parRun.deck[0].uid];
+scoreHand(parRun, [parRun.deck[0].uid]);
+check('减半标记已设置', pf.ultHalfNext === true);
+pf.hp = pf.maxHp;
+pf.hand = [parRun.deck[1].uid];
+const voltRes2 = scoreHand(parRun, [parRun.deck[1].uid]);
+const halveEv = voltRes2.events.find(e => e.type === 'ultHalve');
+check('下一手伤害减半生效', !!halveEv && halveEv.to === Math.max(1, Math.floor(halveEv.from / 2)));
+check('减半一次性消耗', pf.ultHalfNext === false);
+
+// 娜姿·二次预知：再封一种属性
+const sabRun2 = newRun(63);
+sabRun2.fightIdx = 11;
+startFight(sabRun2);
+const sf2 = sabRun2.fight;
+sf2.hp = Math.ceil(sf2.maxHp * 0.6) + 5;
+sf2.hand = [sabRun2.deck[0].uid];
+scoreHand(sabRun2, [sabRun2.deck[0].uid]);
+check('娜姿大招再封一种属性', !!sf2.seal2Type && sf2.seal2Type !== sf2.rule.type);
+const sealedCard2 = sabRun2.deck.find(c => c.type === sf2.seal2Type);
+sf2.hand = [sealedCard2.uid];
+sf2.hp = sf2.maxHp;
+sf2.ultUsed = true;
+const seal2Res = scoreHand(sabRun2, [sealedCard2.uid]);
+check('二次封锁属性攻击减半', seal2Res.total === Math.round((5 + Math.floor(cardChips(sealedCard2) * 0.5)) * 1));
+
+// 阿橘·烟幕：弃牌清零
+const smkRun = newRun(64);
+smkRun.fightIdx = 9;
+startFight(smkRun);
+const mkf = smkRun.fight;
+mkf.hp = Math.ceil(mkf.maxHp * 0.6) + 5;
+mkf.hand = [smkRun.deck[0].uid];
+const smokeRes = scoreHand(smkRun, [smkRun.deck[0].uid]);
+check('阿橘大招清空弃牌次数', mkf.discards === 0 && smokeRes.events.some(e => e.type === 'ult'));
+
+// 板木·大地威压：下一手倍率封顶 6
+const gioRun = newRun(65);
+gioRun.fightIdx = 15;
+startFight(gioRun);
+const gf = gioRun.fight;
+const bigCard = gioRun.deck[0];
+bigCard.multBonus = 20;
+gf.rule = { kind: 'none' }; // 隔离规则，单测大招封顶
+gf.ultCapNext = 6;
+gf.hand = [bigCard.uid];
+const gioRes = scoreHand(gioRun, [bigCard.uid]);
+const capEv = gioRes.events.find(e => e.type === 'ruleCap' && e.ult);
+check('板木大招：下一手倍率封顶 6', !!capEv && capEv.to === 6);
+check('大招封顶一次性消耗', gf.ultCapNext === 0);
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

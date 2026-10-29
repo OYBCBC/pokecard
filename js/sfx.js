@@ -201,4 +201,10 @@ export const sfx = {
       tone({ freq: f, dur: 0.16, delay: i * 0.13, type: 'square', vol: 0.1 * sfxVol }));
     tone({ freq: 131, dur: 0.6, type: 'sine', vol: 0.14 * sfxVol, delay: 0.9 });
   },
+  ult() { // 馆主大招：警报三连 + 低音重击
+    tone({ freq: 660, dur: 0.09, type: 'square', vol: 0.1 * sfxVol });
+    tone({ freq: 622, dur: 0.09, type: 'square', vol: 0.1 * sfxVol, delay: 0.1 });
+    tone({ freq: 660, dur: 0.09, type: 'square', vol: 0.1 * sfxVol, delay: 0.2 });
+    tone({ freq: 90, dur: 0.4, type: 'sawtooth', vol: 0.15 * sfxVol, delay: 0.3, slide: -30 });
+  },
 };

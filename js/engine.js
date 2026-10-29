@@ -26,6 +26,7 @@ export function newRun(seed, weeklyKey = null, forcedVariant = null) {
     items: [],            // 道具 id 列表（最多 5）
     itemBonus: {},        // 成长型道具的累计加成 itemId -> n
     consumables: [],      // 消耗品 id 列表（最多 2）
+    consBought: {},       // 消耗品购买计数（成长类逐次涨价）
     handLevels: {},       // handKey -> level（默认 1）
     handUses: {},         // handKey -> 本局使用次数
     stats: { maxHit: 0, handsPlayed: 0, fightsWon: 0, moneyEarned: 0 },
@@ -125,6 +126,11 @@ export function startFight(run) {
     sleepUid: null,
     poison: 0,        // 剧毒层数（剧毒宝珠）
     sashUsed: false,  // 气势披带是否已用（本场）
+    ult: info.isLeader && info.ult ? info.ult : null, // 馆主/冠军大招（训练师战无）
+    ultUsed: false,   // 大招是否已发动（每场一次）
+    ultHalfNext: false, // 大招·十万伏特：下一手伤害减半（待消耗）
+    ultCapNext: 0,      // 大招·大地威压：下一手倍率封顶值（待消耗）
+    seal2Type: null,    // 大招·二次预知：第二个被封锁的属性
   };
   refillPile(run);
   drawTo(run, run.fight.handSize);
@@ -294,10 +300,11 @@ export function scoreHand(run, playedUids) {
       else if (w.weak.includes(card.type)) weatherMult = 0.75;
       if (weatherMult) gain = Math.round(gain * weatherMult);
     }
-    // 馆主规则：属性削弱
+    // 馆主规则：属性削弱（含娜姿大招"二次预知"追加的第二属性）
     const r = f.rule;
-    if ((r.kind === 'debuffType' && card.type === r.type) ||
-        (r.kind === 'sealType' && card.type === r.type)) {
+    const sealed = (r.kind === 'debuffType' && card.type === r.type) ||
+      (r.kind === 'sealType' && (card.type === r.type || (f.seal2Type != null && card.type === f.seal2Type)));
+    if (sealed) {
       gain = Math.floor(gain * (typeof r.factor === 'number' ? r.factor : 0.5));
       events.push({ type: 'ruleDebuff', cardUid: card.uid });
     }
@@ -349,7 +356,24 @@ export function scoreHand(run, playedUids) {
     mult = f.rule.cap;
   }
 
+  // 5.5) 大招·大地威压：下一手倍率封顶（一次性，无论是否触发都消耗）
+  if (f.ultCapNext > 0) {
+    if (mult > f.ultCapNext) {
+      events.push({ type: 'ruleCap', from: mult, to: f.ultCapNext, ult: true });
+      mult = f.ultCapNext;
+    }
+    f.ultCapNext = 0;
+  }
+
   let total = Math.max(1, Math.round(chips * mult));
+
+  // 5.6) 大招·十万伏特：下一手伤害减半（一次性）
+  if (f.ultHalfNext) {
+    f.ultHalfNext = false;
+    const halved = Math.max(1, Math.floor(total / 2));
+    events.push({ type: 'ultHalve', from: total, to: halved });
+    total = halved;
+  }
   events.push({ type: 'total', chips, mult, total });
 
   // 剧毒宝珠：打出毒属性卡叠层，此后每手结算造成固定伤害
@@ -371,6 +395,11 @@ export function scoreHand(run, playedUids) {
   f.hp = Math.max(0, f.hp - total);
   f.plays++;
   f.hands--;
+  // 馆主大招：血量首次跌破阈值时发动（每场一次；直接击杀则不触发）
+  if (f.ult && !f.ultUsed && f.hp > 0 && f.hp <= f.maxHp * RULES.ultTrigger) {
+    f.ultUsed = true;
+    events.push(applyUlt(run, f));
+  }
   // 气势披带：手数用尽仍未获胜 → 追加一手（每场一次）
   if (f.hp > 0 && f.hands <= 0 && !f.sashUsed && run.items.includes('focusSash')) {
     f.hands += 1;
@@ -409,6 +438,55 @@ export function afterPlay(run) {
 
 export function fightWon(run) { return run.fight.hp <= 0; }
 export function fightLost(run) { return run.fight.hands <= 0 && run.fight.hp > 0; }
+
+// ---------- 馆主大招 ----------
+// kind: healMax（回复最大血量%）| healLost（回复已损%）| halveNext（下一手伤害减半）
+//     | sealAnother（再封一种属性）| burnDiscards（弃牌清零）
+//     | gambleHeal（赌回血/自损）| capNext（下一手倍率封顶）
+function applyUlt(run, f) {
+  const u = f.ult;
+  const ev = { type: 'ult', name: u.name, desc: u.desc };
+  switch (u.kind) {
+    case 'healMax': {
+      ev.heal = Math.min(f.maxHp - f.hp, Math.round(f.maxHp * u.pct));
+      f.hp += ev.heal;
+      break;
+    }
+    case 'healLost': {
+      ev.heal = Math.min(f.maxHp - f.hp, Math.round((f.maxHp - f.hp) * u.pct));
+      f.hp += ev.heal;
+      break;
+    }
+    case 'halveNext':
+      f.ultHalfNext = true;
+      break;
+    case 'sealAnother': {
+      const pool = Object.keys(TYPES).filter(t => t !== f.rule.type && t !== f.seal2Type);
+      f.seal2Type = rngPick(run.rng, pool);
+      ev.seal2 = f.seal2Type;
+      break;
+    }
+    case 'burnDiscards':
+      f.discards = 0;
+      break;
+    case 'gambleHeal': {
+      if (rngNext(run.rng) < 0.5) {
+        ev.heal = Math.min(f.maxHp - f.hp, Math.round(f.maxHp * u.healPct));
+        f.hp += ev.heal;
+        ev.good = true;
+      } else {
+        ev.selfDmg = Math.min(f.hp, Math.round(f.maxHp * u.hurtPct));
+        f.hp -= ev.selfDmg; // 赌输自损，可能直接倒下
+        ev.good = false;
+      }
+      break;
+    }
+    case 'capNext':
+      f.ultCapNext = u.value;
+      break;
+  }
+  return ev;
+}
 
 // ---------- 战斗胜利结算 ----------
 export function previewReward(run) {
@@ -489,7 +567,9 @@ export function restock(run) {
 }
 
 export function consumablePrice(run, id) {
-  let p = CONSUMABLES[id].price;
+  const c = CONSUMABLES[id];
+  // 成长类消耗品逐次涨价（堵死"无限买药"）
+  let p = c.price + (c.ramp || 0) * ((run.consBought || {})[id] || 0);
   for (const own of run.items) {
     if (ITEMS[own] && ITEMS[own].priceDiscount) p -= ITEMS[own].priceDiscount;
   }
@@ -517,6 +597,8 @@ export function buyConsumable(run, idx) {
   run.money -= price;
   run.consumables.push(id);
   run.shop.bought['c' + idx] = true;
+  run.consBought = run.consBought || {};
+  run.consBought[id] = (run.consBought[id] || 0) + 1;
   return true;
 }
 
@@ -871,6 +953,8 @@ export function save(run) {
         plays: fight.plays, poison: fight.poison, sashUsed: fight.sashUsed,
         drawPile: fight.drawPile, hand: fight.hand, discardPile: fight.discardPile,
         sleepUid: fight.sleepUid, handSize: fight.handSize,
+        ultUsed: fight.ultUsed, ultHalfNext: fight.ultHalfNext,
+        ultCapNext: fight.ultCapNext, seal2Type: fight.seal2Type,
       } : null,
       uidCounter,
     };
@@ -905,6 +989,9 @@ export function load() {
         drawPile: data.fightSaved.drawPile, hand: data.fightSaved.hand,
         discardPile: data.fightSaved.discardPile, sleepUid: data.fightSaved.sleepUid,
         handSize: data.fightSaved.handSize,
+        ult: info.isLeader && info.ult ? info.ult : null,
+        ultUsed: !!data.fightSaved.ultUsed, ultHalfNext: !!data.fightSaved.ultHalfNext,
+        ultCapNext: data.fightSaved.ultCapNext || 0, seal2Type: data.fightSaved.seal2Type || null,
       };
       // 自愈：旧版本娜姿 sealType 缺 factor 会把 hp 打成 NaN（序列化为 null），
       // 数值异常时整场重开，避免卡死在无法获胜的战斗
