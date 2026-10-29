@@ -16,7 +16,7 @@ const {
   buildWeeklyEntry, getSettings, saveSettings, save, load,
   encodeChallenge, decodeChallenge, buildReportJson,
 } = await import('../js/engine.js');
-const { cardChips, WEEKLY_VARIANTS, weeklyVariant: variantOf, targetHp } = await import('../js/data.js');
+const { cardChips, WEEKLY_VARIANTS, weeklyVariant: variantOf, targetHp, GYMS } = await import('../js/data.js');
 
 let pass = 0, fail = 0;
 function check(name, cond, extra = '') {
@@ -163,6 +163,25 @@ const waterCard = wr2.deck.find(c => c.type === 'water');
 wr2.fight.hand = [waterCard.uid];
 const wres2 = scoreHand(wr2, [waterCard.uid]);
 check('大晴天：水卡被弱化 ×0.75', wres2.total === Math.round((5 + Math.round(cardChips(waterCard) * 0.75)) * 1));
+
+// ---- 娜姿·意念封锁（回归：sealType 规则缺 factor 曾把伤害打成 NaN，hp 变 NaN 永远无法获胜）----
+const sabrina = GYMS.find(g => g.leader === '娜姿');
+check('娜姿规则带 factor 0.5（攻击减半）', sabrina.rule.kind === 'sealType' && sabrina.rule.factor === 0.5);
+const sealRun = newRun(2026);
+const sealCard = sealRun.deck.find(c => c.type === 'fire');
+sealRun.fight.rule = { kind: 'sealType', type: 'fire' }; // 模拟缺 factor 的旧数据/旧存档
+sealRun.fight.hand = [sealCard.uid];
+const sealRes = scoreHand(sealRun, [sealCard.uid]);
+check('封锁属性卡伤害为有限数（不再 NaN）', Number.isFinite(sealRes.total) && sealRes.total >= 1);
+check('封锁属性卡攻击正好减半', sealRes.total === Math.round((5 + Math.floor(cardChips(sealCard) * 0.5)) * 1));
+check('封锁结算后 hp 正常下降', Number.isFinite(sealRun.fight.hp) && sealRun.fight.hp === sealRun.fight.maxHp - sealRes.total);
+// NaN 存档自愈
+const broken = newRun(3);
+broken.fight.hp = NaN;
+save(broken);
+const healed = load();
+check('血量损坏的存档加载时自动重开本场', Number.isFinite(healed.fight.hp) && healed.fight.hp > 0 && healed.fight.maxHp === healed.fight.hp);
+
 
 // ---- 剧毒宝珠 ----
 const tr = newRun(43);

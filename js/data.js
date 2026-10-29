@@ -195,7 +195,7 @@ export const GYMS = [
     ] },
   { gym: '金黄道馆', leader: '娜姿', badge: '金色徽章', ace: 65, aceName: '胡地', color: '#f858a8',
     trainer: '超能力者·小遥', trainerAce: 64, trainerAceName: '勇基拉',
-    rule: { kind: 'sealType' }, ruleDesc: '意念封锁：随机一种属性被封锁，该属性卡的攻击减半',
+    rule: { kind: 'sealType', factor: 0.5 }, ruleDesc: '意念封锁：随机一种属性被封锁，该属性卡的攻击减半',
     victory: '……有趣。我的预知能力，第一次落空了。',
     dialogue: [
       { s: '娜姿', t: '你的到来，我早就用超能力预见了。' },

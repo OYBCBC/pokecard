@@ -298,7 +298,7 @@ export function scoreHand(run, playedUids) {
     const r = f.rule;
     if ((r.kind === 'debuffType' && card.type === r.type) ||
         (r.kind === 'sealType' && card.type === r.type)) {
-      gain = Math.floor(gain * r.factor);
+      gain = Math.floor(gain * (typeof r.factor === 'number' ? r.factor : 0.5));
       events.push({ type: 'ruleDebuff', cardUid: card.uid });
     }
     chips += gain;
@@ -902,6 +902,11 @@ export function load() {
         discardPile: data.fightSaved.discardPile, sleepUid: data.fightSaved.sleepUid,
         handSize: data.fightSaved.handSize,
       };
+      // 自愈：旧版本娜姿 sealType 缺 factor 会把 hp 打成 NaN（序列化为 null），
+      // 数值异常时整场重开，避免卡死在无法获胜的战斗
+      if (!Number.isFinite(run.fight.hp) || !Number.isFinite(run.fight.maxHp) || run.fight.hp <= 0) {
+        startFight(run);
+      }
     } else if (run.phase === 'shop') {
       openShop(run);
     }
