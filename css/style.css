@@ -23,6 +23,7 @@ img { pointer-events: none; }
 }
 .big-btn.red { background: linear-gradient(#e8544a, #c53a31); box-shadow: 0 5px 0 #8d231c; }
 .big-btn.blue { background: linear-gradient(#4a90e8, #3572c0); box-shadow: 0 5px 0 #1f4a80; }
+.big-btn.ghost { background: linear-gradient(#48567a, #38456a); box-shadow: 0 5px 0 #232c42; }
 .big-btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-2px); }
 .big-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
 .big-btn:disabled { filter: grayscale(.7) brightness(.6); cursor: not-allowed; }
@@ -157,14 +158,21 @@ img { pointer-events: none; }
   border: 2px solid rgba(20, 24, 38, .55);
   box-shadow: inset 0 0 0 2.5px var(--tc, #888), 0 4px 10px rgba(0,0,0,.45);
   cursor: pointer;
-  transition: transform .13s cubic-bezier(.3,1.3,.5,1), box-shadow .13s ease;
+  /* 回收（取消选中）走平滑缓收：弹力曲线回落会先冲过基线再回弹，观感像"没收回去" */
+  transition: transform .18s ease-out, box-shadow .15s ease, opacity .2s ease;
   animation: cardIn .25s ease backwards;
 }
-.card:hover:not(.asleep) { transform: translateY(-6px); z-index: 2; }
+/* 悬停抬起只给"真鼠标"设备：触摸屏上 :hover 会粘在最后点过的元素上，
+   导致取消选中后卡片停在 -6px 半抬起位置、回不到牌行基线（连点两张时最后一张必中） */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover:not(.asleep) { transform: translateY(-6px); z-index: 2; }
+}
 .card:active:not(.asleep) { transform: translateY(-2px) scale(.97); }
 .card.selected {
   transform: translateY(-24px); z-index: 3;
   box-shadow: inset 0 0 0 2.5px var(--tc, #888), 0 0 0 3px #ffd76a, 0 12px 24px rgba(0,0,0,.55);
+  /* 选中瞬间用弹性曲线"弹出"（回落由 .card 基类的平滑缓收接管） */
+  transition: transform .13s cubic-bezier(.3,1.3,.5,1), box-shadow .13s ease, opacity .2s ease;
 }
 .card.deny { animation: denyShake .3s ease; }
 .card.gone { opacity: 0; transform: translateY(-40px) scale(.8); }
@@ -250,6 +258,8 @@ img { pointer-events: none; }
   background: #4a3a12; border: 1px solid #ffd76a; color: #ffe8a8;
   font-size: 14px; font-weight: 700; padding: 6px 14px; border-radius: 10px; margin: 4px 0;
 }
+/* 消耗品选卡模式：手牌加虚线提示"点击即对该卡使用" */
+.hand-area.selecting .card:not(.asleep) { outline: 2px dashed #ffd76a; outline-offset: 2px; }
 
 /* ---------------- 动画 ---------------- */
 @keyframes cardIn { from { transform: translateY(40px); opacity: 0; } }
@@ -568,7 +578,8 @@ img { pointer-events: none; }
   body { overflow-y: auto; }                      /* 允许滚动，杜绝内容被顶出屏幕 */
   .mobile-only { display: inline-block; }
   .screen { height: auto; min-height: 100vh; min-height: 100dvh; }
-  .hand-area { flex: 1 0 auto; min-height: 118px; }
+  /* 132px = 卡高104 + 底距8 + 抬起16 + 顶部余量，防止选中卡顶部被滚动容器裁切 */
+  .hand-area { flex: 1 0 auto; min-height: 132px; }
   .battle-main { grid-template-columns: 1fr; }
   .arena { min-width: 0; }
   .score-strip { flex-wrap: wrap; }

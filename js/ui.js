@@ -137,11 +137,16 @@ function cardHtml(card, { mini = false, inHand = false } = {}) {
   </div>`;
 }
 
-// 选牌实时预览：当前选中将打出的手牌类型与预估伤害
+// 选牌实时预览：当前选中将打出的手牌类型与预估伤害；同时联动"取消选择"按钮
 function updateHandPreview() {
   const el = $('#handPreview');
   if (!el || !run || !run.fight) return;
+  const clearBtn = $('#clearSelBtn');
   const cards = [...selected].map(uid => run.deck.find(c => c.uid === uid)).filter(Boolean);
+  if (clearBtn) {
+    clearBtn.hidden = cards.length === 0;
+    clearBtn.innerHTML = `取消选择 <small>${cards.length} 张</small>`;
+  }
   if (!cards.length) {
     el.innerHTML = '<span class="dim">点击卡牌选中（1~5 张），打出前这里会预估手牌与伤害</span>';
     return;
@@ -258,13 +263,14 @@ function renderBattle() {
           <div class="played-row" id="playedRow"></div>
         </div>
         ${targeting ? `<div class="targeting-banner">选择一张手牌使用【${CONSUMABLES[run.consumables[targeting.cIdx]]?.name || ''}】<button class="mini-btn" data-action="cancelTargeting">取消</button></div>` : ''}
-        <div class="hand-area" id="handArea">
+        <div class="hand-area ${targeting ? 'selecting' : ''}" id="handArea">
           ${handCards.map(c => cardHtml(c, { inHand: true })).join('')}
         </div>
         <div class="hand-preview" id="handPreview"></div>
         <div class="actions">
           <button class="big-btn red sm" data-action="play" id="playBtn">打出 <small>剩余 ${f.hands} 手</small></button>
           <button class="big-btn blue sm" data-action="discard" id="discardBtn" ${f.discards <= 0 ? 'disabled' : ''}>弃牌 <small>剩 ${f.discards} 次</small></button>
+          <button class="big-btn ghost sm" data-action="clearSelection" id="clearSelBtn" hidden>取消选择</button>
         </div>
       </section>
       ${itemsPanelHtml(true)}
@@ -340,6 +346,8 @@ async function doPlay() {
   busy = true;
   const uids = [...selected];
   selected.clear();
+  // 打出与消耗品选卡互斥：清掉选卡状态与横幅，避免计分动画中横幅残留
+  if (targeting) { targeting = null; const b = $('.targeting-banner'); if (b) b.remove(); }
 
   // 把打出的卡视觉上移到计分区
   const handEl = $('#handArea');
@@ -1200,10 +1208,20 @@ async function onClick(e) {
       updateHandPreview();
       break;
     }
+    case 'clearSelection': {
+      if (selected.size === 0) break;
+      selected.clear();
+      sfx.deselect();
+      // 就地摘掉所有卡的选中态，保证每张卡都回落原位；不整页重渲染以保住滚动位置与动画
+      document.querySelectorAll('#handArea .card.selected').forEach(c => c.classList.remove('selected'));
+      updateHandPreview();
+      break;
+    }
     case 'play': doPlay(); break;
     case 'discard': {
       if (selected.size === 0 || run.fight.discards <= 0) return;
       sfx.discard();
+      targeting = null; // 弃牌与消耗品选卡互斥，防止横幅在重渲染后复活
       discardCards(run, [...selected]);
       selected.clear();
       save(run);
@@ -1258,7 +1276,14 @@ async function onClick(e) {
       }
       break;
     }
-    case 'cancelTargeting': targeting = null; render(); break;
+    case 'cancelTargeting':
+      targeting = null;
+      if (busy) {
+        // 计分动画进行中只摘横幅，不整页重建（等动画收尾统一渲染），避免画面闪乱
+        const b = $('.targeting-banner');
+        if (b) b.remove();
+      } else render();
+      break;
     case 'cancelDeckTargeting':
       deckTargeting = null;
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
