@@ -628,11 +628,11 @@ function renderShop() {
       </div>
     </div>
     <div class="shop-section">
-      <div class="panel-title">身上的携带物（点击出售）</div>
+      <div class="panel-title">身上的携带物（点击查看详情 / 出售）</div>
       <div class="owned-items">
         ${run.items.length ? run.items.map((id, i) => {
           const d = ITEMS[id]; const r = RARITY[d.rarity];
-          return `<div class="owned-item" data-action="sell" data-idx="${i}" data-tip="${d.name}<br>${d.desc}<br>点击出售（$${Math.floor(r.price / 2)}）">
+          return `<div class="owned-item" data-action="itemInfo" data-idx="${i}" data-tip="${d.name}<br>${d.desc}<br>点击查看详情（出售价 $${Math.floor(r.price / 2)}）">
             <img src="assets/items/${d.slug}.png"><span>$${Math.floor(r.price / 2)}</span></div>`;
         }).join('') : '<span class="dim">（空）</span>'}
       </div>

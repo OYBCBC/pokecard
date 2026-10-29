@@ -1,5 +1,5 @@
 // Service Worker：离线缓存（自动生成，勿手改；新增文件后重跑 tools/make-sw.sh）
-const CACHE = 'gymrun-v26';
+const CACHE = 'gymrun-v27';
 const ASSETS = [
 './',
 'index.html',
