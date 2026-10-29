@@ -53,10 +53,10 @@ function power(run, uid) {
 }
 
 function botShop(run) {
-  for (const id of run.shop.items) {
-    if (run.items.length >= 5) break;
-    if (run.money >= itemPrice(run, id)) buyItem(run, id);
-  }
+  run.shop.items.forEach((id, idx) => {
+    if (run.items.length >= 5) return;
+    if (run.money >= itemPrice(run, id)) buyItem(run, idx);
+  });
 }
 
 function simulate(seed) {

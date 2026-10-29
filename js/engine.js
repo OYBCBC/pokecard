@@ -496,23 +496,27 @@ export function consumablePrice(run, id) {
   return Math.max(1, p);
 }
 
-export function buyItem(run, id) {
+// 购买按货架格子记账（'i'+idx / 'c'+idx）而非商品 id：
+// 货架上可能出现两格相同商品（消耗品摆货不查重），按 id 记会把没买的那格也标成已购
+export function buyItem(run, idx) {
+  const id = run.shop.items[idx];
+  if (!id || run.shop.bought['i' + idx]) return false;
   const price = itemPrice(run, id);
   if (run.money < price || run.items.length >= RULES.itemSlots) return false;
-  if (!run.shop.items.includes(id) || run.shop.bought[id]) return false;
   run.money -= price;
   run.items.push(id);
-  run.shop.bought[id] = true;
+  run.shop.bought['i' + idx] = true;
   return true;
 }
 
-export function buyConsumable(run, id) {
+export function buyConsumable(run, idx) {
+  const id = run.shop.consumables[idx];
+  if (!id || run.shop.bought['c' + idx]) return false;
   const price = consumablePrice(run, id);
   if (run.money < price || run.consumables.length >= RULES.consumableSlots) return false;
-  if (run.shop.bought['c_' + id]) return false;
   run.money -= price;
   run.consumables.push(id);
-  run.shop.bought['c_' + id] = true;
+  run.shop.bought['c' + idx] = true;
   return true;
 }
 

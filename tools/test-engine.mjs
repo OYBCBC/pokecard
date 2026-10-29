@@ -9,7 +9,7 @@ globalThis.localStorage = {
 
 const {
   newRun, newRun2P, leaveShop, winFight, fightWon, scoreHand,
-  useConsumableInstant, useConsumableDeckCard, useConsumableCard, sellConsumable, buyConsumable, openShop,
+  useConsumableInstant, useConsumableDeckCard, useConsumableCard, sellConsumable, buyConsumable, buyItem, openShop,
   MIN_DECK,
   markDexSeen, markCardSeen, loadDex, loadDexShiny, dexSeenCount, dexShinyCount,
   weeklySeed, dailySeed, roomKeyFor, runBoardKey, weekKey, weeklyVariant, previewReward, recordWeeklyResult, getWeeklyBoard, weeklyScore,
@@ -81,9 +81,23 @@ check('强化后消耗品已消耗', shopRun.consumables.length === 0);
 // 背包满时不可购买
 openShop(shopRun);
 shopRun.consumables = ['pokeBall', 'zinc'];
-check('背包满时购买消耗品失败', buyConsumable(shopRun, shopRun.shop.consumables[0]) === false);
+check('背包满时购买消耗品失败', buyConsumable(shopRun, 0) === false);
 sellConsumable(shopRun, 0);
-check('腾出槽位后可购买', buyConsumable(shopRun, shopRun.shop.consumables[0]) === true);
+check('腾出槽位后可购买', buyConsumable(shopRun, 0) === true);
+// ---- 货架重复商品（回归：两格相同消耗品，买一格曾把另一格也标成已购）----
+const dupRun = newRun(6);
+openShop(dupRun);
+dupRun.money = 50;
+dupRun.shop.consumables = ['protein', 'protein'];
+dupRun.shop.bought = {};
+check('重复消耗品：第一格可买', buyConsumable(dupRun, 0) === true && dupRun.consumables.length === 1);
+check('重复消耗品：第二格仍可买', buyConsumable(dupRun, 1) === true && dupRun.consumables.length === 2);
+check('重复消耗品：买后记账按格子互不影响', dupRun.shop.bought['c0'] === true && dupRun.shop.bought['c1'] === true);
+dupRun.consumables = [];
+dupRun.shop.items = ['charcoal', 'charcoal'];
+check('重复道具：两格各自可买', buyItem(dupRun, 0) === true && buyItem(dupRun, 1) === true && dupRun.items.length === 2);
+check('已购格子不可重复购买', buyItem(dupRun, 0) === false);
+check('越界格子购买返回失败', buyItem(dupRun, 9) === false && buyConsumable(dupRun, 9) === false);
 
 // ---- 图鉴 ----
 markDexSeen(25);

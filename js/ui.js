@@ -525,25 +525,25 @@ function fillRewardMoneyHtml(detail) {
 }
 
 // ---------------- 商店界面 ----------------
-function shopItemCard(id) {
+function shopItemCard(id, idx) {
   const d = ITEMS[id];
   const r = RARITY[d.rarity];
   const price = itemPrice(run, id);
-  const owned = run.shop.bought[id];
+  const owned = run.shop.bought['i' + idx];
   return `
   <div class="shop-card ${owned ? 'sold' : ''}" style="--rc:${r.color}">
     <div class="shop-card-head rarity-${d.rarity}">${d.name}<span class="rarity-tag">${r.name}</span></div>
     <img class="shop-img" src="assets/items/${d.slug}.png">
     <div class="shop-desc">${d.desc}</div>
     ${owned ? '<div class="sold-mark">已购买</div>'
-      : `<button class="buy-btn" data-action="buyItem" data-id="${id}" ${run.money < price || run.items.length >= RULES.itemSlots ? 'disabled' : ''}>$${price}</button>`}
+      : `<button class="buy-btn" data-action="buyItem" data-idx="${idx}" ${run.money < price || run.items.length >= RULES.itemSlots ? 'disabled' : ''}>$${price}</button>`}
   </div>`;
 }
 
-function shopConsumableCard(id) {
+function shopConsumableCard(id, idx) {
   const d = CONSUMABLES[id];
   const price = consumablePrice(run, id);
-  const owned = run.shop.bought['c_' + id];
+  const owned = run.shop.bought['c' + idx];
   const full = run.consumables.length >= RULES.consumableSlots;
   const noMoney = run.money < price;
   const blockTitle = full ? '背包已满，先使用或出售一个' : noMoney ? '钱不够' : '';
@@ -553,7 +553,7 @@ function shopConsumableCard(id) {
     <img class="shop-img" src="assets/items/${d.slug}.png">
     <div class="shop-desc">${d.desc}</div>
     ${owned ? '<div class="sold-mark">已购买</div>'
-      : `<button class="buy-btn" data-action="buyConsumable" data-id="${id}" ${full || noMoney ? 'disabled' : ''} ${blockTitle ? `title="${blockTitle}"` : ''}>$${price}</button>`}
+      : `<button class="buy-btn" data-action="buyConsumable" data-idx="${idx}" ${full || noMoney ? 'disabled' : ''} ${blockTitle ? `title="${blockTitle}"` : ''}>$${price}</button>`}
   </div>`;
 }
 
@@ -589,10 +589,10 @@ function renderShop() {
       <span class="shop-next">下一战：<b>${nextInfo.name}</b>${nextInfo.isLeader && nextInfo.ruleDesc ? ` · <span class="opp-rule-inline">${nextInfo.ruleDesc}</span>` : ' · <span class="dim">常规战</span>'}</span>
     </div>
     <div class="shop-section"><div class="panel-title">携带道具</div>
-      <div class="shop-grid">${run.shop.items.map(shopItemCard).join('')}</div>
+      <div class="shop-grid">${run.shop.items.map((id, i) => shopItemCard(id, i)).join('')}</div>
     </div>
     <div class="shop-section"><div class="panel-title">消耗品${run.consumables.length >= RULES.consumableSlots ? '（背包已满，先使用或出售一个）' : '（战斗中使用）'}</div>
-      <div class="shop-grid cons">${run.shop.consumables.map(shopConsumableCard).join('')}</div>
+      <div class="shop-grid cons">${run.shop.consumables.map((id, i) => shopConsumableCard(id, i)).join('')}</div>
     </div>
     <div class="shop-section">
       <div class="panel-title">背包（${run.consumables.length}/${RULES.consumableSlots}）</div>
@@ -1361,8 +1361,8 @@ async function onClick(e) {
       break;
     }
 
-    case 'buyItem': if (buyItem(run, btn.dataset.id)) { sfx.coin(); save(run); } render(); break;
-    case 'buyConsumable': if (buyConsumable(run, btn.dataset.id)) { sfx.coin(); save(run); } render(); break;
+    case 'buyItem': if (buyItem(run, +btn.dataset.idx)) { sfx.coin(); save(run); } render(); break;
+    case 'buyConsumable': if (buyConsumable(run, +btn.dataset.idx)) { sfx.coin(); save(run); } render(); break;
     case 'sell': sfx.click(); showSellConfirm('item', +btn.dataset.idx); break;
     case 'sellConsumable': sfx.click(); showSellConfirm('consumable', +btn.dataset.idx); break;
     case 'confirmSell': {
