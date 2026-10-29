@@ -146,4 +146,59 @@ export const sfx = {
   lose() { [392, 330, 262, 196].forEach((f, i) => tone({ freq: f, dur: 0.2, delay: i * 0.18, type: 'sawtooth', vol: 0.1 * sfxVol })); },
   badge() { [659, 784, 988, 1319].forEach((f, i) => tone({ freq: f, dur: 0.12, delay: i * 0.09, type: 'triangle', vol: 0.12 * sfxVol })); },
   sleep() { tone({ freq: 400, dur: 0.3, type: 'sine', vol: 0.1 * sfxVol, slide: -150 }); },
+  // ---- v1.8 全交互音效 ----
+  deal() { // 抽牌：纸牌快速滑出的摩擦感
+    noise({ dur: 0.06, vol: 0.05 * sfxVol });
+    tone({ freq: 900, dur: 0.05, type: 'triangle', vol: 0.05 * sfxVol, slide: 300, delay: 0.02 });
+    tone({ freq: 700, dur: 0.04, type: 'triangle', vol: 0.04 * sfxVol, delay: 0.06 });
+  },
+  reroll() { // 刷新货架：哗啦重摆
+    noise({ dur: 0.12, vol: 0.09 * sfxVol });
+    noise({ dur: 0.1, vol: 0.07 * sfxVol, delay: 0.1 });
+    tone({ freq: 500, dur: 0.1, type: 'triangle', vol: 0.08 * sfxVol, slide: 260, delay: 0.16 });
+  },
+  deny() { // 无效操作：短促低鸣（区别于"受伤"）
+    tone({ freq: 180, dur: 0.12, type: 'square', vol: 0.09 * sfxVol });
+    tone({ freq: 150, dur: 0.1, type: 'square', vol: 0.08 * sfxVol, delay: 0.09 });
+  },
+  sell() { // 出售：下行双币（买=上行 coin，卖=下行）
+    tone({ freq: 988, dur: 0.06, type: 'square', vol: 0.1 * sfxVol });
+    tone({ freq: 740, dur: 0.1, type: 'square', vol: 0.1 * sfxVol, delay: 0.07 });
+  },
+  upgrade() { // 强化/手牌升级：上行琶音
+    [440, 554, 659, 880].forEach((f, i) => tone({ freq: f, dur: 0.09, type: 'triangle', vol: 0.1 * sfxVol, delay: i * 0.07 }));
+  },
+  release() { // 放生：温暖的下降告别
+    [660, 550, 440].forEach((f, i) => tone({ freq: f, dur: 0.16, type: 'sine', vol: 0.1 * sfxVol, delay: i * 0.12 }));
+  },
+  dup() { // 复制：同音回声
+    tone({ freq: 620, dur: 0.08, type: 'square', vol: 0.1 * sfxVol });
+    tone({ freq: 620, dur: 0.1, type: 'square', vol: 0.06 * sfxVol, delay: 0.1 });
+  },
+  sparkle() { // 闪光：高频闪亮铃音
+    [1568, 1976, 2637].forEach((f, i) => tone({ freq: f, dur: 0.14, type: 'sine', vol: 0.08 * sfxVol, delay: i * 0.06 }));
+  },
+  capture() { // 精灵球收服：晃三下 + 收服确认
+    [0, 1, 2].forEach(i => tone({ freq: 340, dur: 0.05, type: 'square', vol: 0.08 * sfxVol, delay: i * 0.12 }));
+    tone({ freq: 523, dur: 0.1, type: 'triangle', vol: 0.1 * sfxVol, delay: 0.36 });
+    tone({ freq: 784, dur: 0.16, type: 'triangle', vol: 0.1 * sfxVol, delay: 0.46 });
+  },
+  itemProc() { // 道具发动：清脆 pop
+    tone({ freq: 740, dur: 0.05, type: 'square', vol: 0.08 * sfxVol });
+    tone({ freq: 990, dur: 0.07, type: 'triangle', vol: 0.08 * sfxVol, delay: 0.05 });
+  },
+  poison() { // 叠毒：低频冒泡
+    tone({ freq: 200, dur: 0.08, type: 'sine', vol: 0.09 * sfxVol, slide: 60 });
+    tone({ freq: 260, dur: 0.08, type: 'sine', vol: 0.08 * sfxVol, slide: 80, delay: 0.09 });
+  },
+  bossIntro() { // 馆主/冠军登场：低音两击 + 紧张上行
+    tone({ freq: 98, dur: 0.22, type: 'sawtooth', vol: 0.14 * sfxVol });
+    tone({ freq: 98, dur: 0.22, type: 'sawtooth', vol: 0.14 * sfxVol, delay: 0.24 });
+    [392, 466, 554].forEach((f, i) => tone({ freq: f, dur: 0.12, type: 'square', vol: 0.08 * sfxVol, delay: 0.5 + i * 0.09 }));
+  },
+  champion() { // 冠军凯歌：号角齐鸣
+    [523, 523, 523, 659, 784, 1047, 784, 1047].forEach((f, i) =>
+      tone({ freq: f, dur: 0.16, delay: i * 0.13, type: 'square', vol: 0.1 * sfxVol }));
+    tone({ freq: 131, dur: 0.6, type: 'sine', vol: 0.14 * sfxVol, delay: 0.9 });
+  },
 };

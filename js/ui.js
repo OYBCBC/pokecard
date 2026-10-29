@@ -285,6 +285,7 @@ function renderBattle() {
 
   if (fightIntroShown !== run.fightIdx) {
     fightIntroShown = run.fightIdx;
+    sfx.deal(); // 开场发牌
     const hasDialogue = (info.kind === 'leader' || info.kind === 'champion') && info.dialogue;
     if (hasDialogue) showDialogue(info, ruleText);
     else showIntro(info, ruleText);
@@ -323,6 +324,7 @@ function showDialogue(info, ruleText) {
       </div>
     </div>`;
   app.appendChild(el);
+  sfx.bossIntro();
   const nameEl = el.querySelector('.dialogue-name');
   const textEl = el.querySelector('.dialogue-text');
   const hintEl = el.querySelector('.dialogue-hint');
@@ -386,7 +388,7 @@ async function doPlay() {
       const slot = document.querySelector(`.item-slot img[src*="${def.slug}"]`);
       if (slot) { const s = slot.parentElement; s.classList.add('triggered'); setTimeout(() => s.classList.remove('triggered'), 300); }
       bumpScore(ev.chipsGain || 0, ev.multGain || 0);
-      sfx.mult();
+      sfx.itemProc();
       await sleep(240);
     } else if (ev.type === 'ruleDebuff') {
       showFloat(rowEl, '规则削弱！', '#ff5a5a');
@@ -405,7 +407,7 @@ async function doPlay() {
       await sleep(420);
     } else if (ev.type === 'poison') {
       showFloat(rowEl, `☠ 中毒 +${ev.add}（共 ${ev.stacks} 层）`, '#a0e050');
-      sfx.mult();
+      sfx.poison();
       await sleep(340);
     } else if (ev.type === 'poisonDmg') {
       showFloat(rowEl, `☠ 毒伤 -${fmt(ev.damage)}`, '#a0e050', 'big');
@@ -428,7 +430,7 @@ async function doPlay() {
   await sleep(500);
 
   if (fightWon(run)) {
-    sfx.win();
+    if (run.fightIdx >= fightCount() - 1) sfx.champion(); else sfx.win();
     rewardPending = true;
     showRewardModal();
   } else if (f.hands <= 0) {
@@ -447,6 +449,7 @@ async function doPlay() {
     afterPlay(run);
     save(run);
     render();
+    sfx.deal(); // 补牌
   }
   busy = false;
 }
@@ -1021,7 +1024,8 @@ function showCaptureModal(card) {
     <button class="big-btn red" data-action="closeModal">太好了！</button>
   </div>`;
   app.appendChild(el);
-  if (card.shiny) sfx.badge(); else sfx.coin();
+  sfx.capture();
+  if (card.shiny) setTimeout(() => sfx.sparkle(), 680); // 收服确认后再闪一下
 }
 
 function showToast(text, isError = false) {
@@ -1137,7 +1141,7 @@ async function onClick(e) {
     case 'joinCode': {
       const input = $('#codeInput');
       const parsed = decodeChallenge(input ? input.value : '');
-      if (!parsed) { showToast('挑战码无效，应以 GYM1. 开头', true); sfx.hurt(); break; }
+      if (!parsed) { showToast('挑战码无效，应以 GYM1. 开头', true); sfx.deny(); break; }
       run = newRun(parsed.seed, null, parsed.variant);
       run.roomKey = roomKeyFor(parsed.seed, parsed.variant);
       selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; lastHandKey = null;
@@ -1172,7 +1176,7 @@ async function onClick(e) {
     }
     case 'continue': {
       const r = load();
-      if (r) { run = r; selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; render(); }
+      if (r) { run = r; selected.clear(); targeting = null; deckTargeting = null; rewardPending = false; sfx.click(); render(); }
       break;
     }
     case 'weeklyBoard': sfx.click(); showWeeklyBoardModal(null, { key: weeklySeed().key }); break;
@@ -1197,7 +1201,7 @@ async function onClick(e) {
         selected.add(uid); sfx.select();
       } else {
         // 已选满 5 张：抖动提示，不重渲染（保住动画）
-        sfx.hurt();
+        sfx.deny();
         btn.classList.remove('deny'); void btn.offsetWidth; btn.classList.add('deny');
         showToast('最多同时选择 5 张');
         break;
@@ -1226,6 +1230,7 @@ async function onClick(e) {
       selected.clear();
       save(run);
       render();
+      sfx.deal(); // 弃牌后补牌
       break;
     }
 
@@ -1238,7 +1243,7 @@ async function onClick(e) {
     case 'sellFromInfo': {
       const idx = +btn.dataset.idx;
       const gain = sellItem(run, idx);
-      if (gain) { run.money += gain; sfx.coin(); save(run); }
+      if (gain) { run.money += gain; sfx.sell(); save(run); }
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
       render();
       break;
@@ -1295,7 +1300,7 @@ async function onClick(e) {
       if (deckTargeting.mode === 'card') { // 蛋白质/锌补剂：商店内对牌组卡强化
         const target = run.deck.find(x => x.uid === uid);
         if (target && useConsumableCard(run, deckTargeting.cIdx, uid)) {
-          sfx.coin();
+          sfx.upgrade();
           showToast(`已强化 ${target.name}！`);
           deckTargeting = null;
           document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
@@ -1307,14 +1312,16 @@ async function onClick(e) {
       const result = useConsumableDeckCard(run, deckTargeting.cIdx, uid);
       if (result && result.error) {
         showToast(result.error, true);
-        sfx.hurt();
+        sfx.deny();
         break;
       }
       const card = result && result.card;
       const msg = result.op === 'remove' ? `放生了 ${card.name}（牌组 ${run.deck.length} 张）`
         : result.op === 'copy' ? `复制了 ${card.shiny ? '✨闪光 ' : ''}${card.name}！`
         : `${card.name} 变成了 ✨闪光宝可梦！`;
-      sfx.coin();
+      if (result.op === 'remove') sfx.release();
+      else if (result.op === 'copy') sfx.dup();
+      else sfx.sparkle();
       showToast(msg);
       deckTargeting = null;
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
@@ -1326,7 +1333,7 @@ async function onClick(e) {
       if (!handPickFor) return;
       useConsumableHandType(run, handPickFor.cIdx, btn.dataset.key);
       handPickFor = null;
-      sfx.coin();
+      sfx.upgrade();
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
       save(run);
       render();
@@ -1371,13 +1378,13 @@ async function onClick(e) {
       const id = kind === 'item' ? run.items[idx] : run.consumables[idx];
       const name = id ? (kind === 'item' ? ITEMS[id] : CONSUMABLES[id]).name : '';
       const gain = kind === 'item' ? sellItem(run, idx) : sellConsumable(run, idx);
-      if (gain) { run.money += gain; sfx.coin(); showToast(`已出售 ${name} +$${gain}`); }
+      if (gain) { run.money += gain; sfx.sell(); showToast(`已出售 ${name} +$${gain}`); }
       document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
       save(run); render();
       break;
     }
     case 'cancelSell': sfx.click(); document.querySelectorAll('.modal-overlay').forEach(m => m.remove()); break;
-    case 'reroll': if (reroll(run)) { sfx.click(); save(run); } render(); break;
+    case 'reroll': if (reroll(run)) { sfx.reroll(); save(run); } render(); break;
     case 'leave': sfx.click(); leaveShop(run); selected.clear(); save(run); render(); break;
 
     case 'toTitle': run = null; render(); break;
@@ -1389,7 +1396,7 @@ async function onClick(e) {
 function applyConsumableToCard(uid) {
   if (!targeting) return;
   if (useConsumableCard(run, targeting.cIdx, uid)) {
-    sfx.coin();
+    sfx.upgrade();
     save(run);
   }
   targeting = null;
